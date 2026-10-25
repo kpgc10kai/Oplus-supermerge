@@ -1,0 +1,30 @@
+# build / packaging
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# tool scratch space
+supermerge_work/
+*.work/
+out/
+abl_pyb110/
+payload_parts/
+
+# images and firmware blobs must never be committed
+*.img
+*.bin
+*.zip
+*.ozip
+*.ofp
+*.efi
+*.mbn
+*.mbn
+*.raw
+
+# test scratch
+supermerge_test_*/
+uefi_dump/
