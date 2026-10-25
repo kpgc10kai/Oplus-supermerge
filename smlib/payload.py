@@ -398,6 +398,7 @@ class Payload:
         verify_ops: bool = True,
         verify_hash: bool = False,
         log: Console | None = None,
+        progress=None,
     ) -> dict[str, str]:
         os.makedirs(out_dir, exist_ok=True)
         todo = [p for p in self.partitions if not names or p.name in names]
@@ -408,6 +409,8 @@ class Payload:
         data_base = self.resolve_data_base()
         results: dict[str, str] = {}
         lock = threading.Lock()
+        total = sum(p.size for p in todo) or 1
+        done = [0]
 
         def work(part: Partition) -> None:
             old = None
@@ -420,6 +423,9 @@ class Payload:
                          verify_ops=verify_ops, verify_hash=verify_hash, log=log)
             with lock:
                 results[part.name] = out
+                done[0] += part.size
+                if progress is not None:
+                    progress(done[0], total, part.name)
 
         if jobs and jobs > 1 and len(todo) > 1:
             from concurrent.futures import ThreadPoolExecutor

@@ -6,6 +6,7 @@ import hashlib
 import os
 import re
 import sys
+import time
 
 SECTOR_SIZE = 512
 BLOCK_SIZE = 4096
@@ -13,6 +14,49 @@ BLOCK_SIZE = 4096
 
 class Fail(Exception):
     """Fatal, user-facing error (printed without a traceback)."""
+
+
+class Progress:
+    """One-line progress indicator that degrades to periodic lines.
+
+    On a terminal the line is redrawn with ``\\r``; when stderr is redirected
+    (logs, CI) a line is printed every 10 % instead, so the output stays
+    readable without flooding it.
+    """
+
+    def __init__(self, log: "Console", total: int, label: str) -> None:
+        self.log = log
+        self.total = max(int(total), 1)
+        self.label = label
+        self.enabled = not getattr(log, "quiet", False)
+        self.tty = sys.stderr.isatty()
+        self.last_bucket = -1
+        self.start = time.time()
+
+    def update(self, done: int, current: str = "") -> None:
+        if not self.enabled:
+            return
+        done = max(0, min(int(done), self.total))
+        pct = done * 100 // self.total
+        elapsed = max(time.time() - self.start, 0.001)
+        rate = done / elapsed
+        tail = (f"{pct:3d}%  {human_size(done)} / {human_size(self.total)}  "
+                f"{human_size(int(rate))}/s")
+        if current:
+            tail += f"  {current}"
+        if self.tty:
+            sys.stderr.write("\r  " + self.label + " " + tail + " " * 6)
+            sys.stderr.flush()
+        else:
+            bucket = pct // 10
+            if bucket > self.last_bucket or pct >= 100:
+                self.last_bucket = bucket
+                print("  " + self.label + " " + tail, file=sys.stderr)
+
+    def close(self) -> None:
+        if self.enabled and self.tty:
+            sys.stderr.write("\n")
+            sys.stderr.flush()
 
 
 def align_up(value: int, alignment: int) -> int:

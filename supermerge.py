@@ -33,7 +33,7 @@ from smlib import regions as regionsmod
 from smlib.models import model_from_payload_properties, models_compatible
 from smlib.payload import Payload, describe_version, open_payload, read_properties
 from smlib.superimg import Entry, LayoutTemplate, SuperBuilder, SuperImage
-from smlib.util import (Console, Fail, human_size, parse_size,
+from smlib.util import (Console, Fail, Progress, human_size, parse_size,
                         setup_stdout, sha256_file, split_slot)
 
 
@@ -366,10 +366,14 @@ def cmd_build(args) -> int:
             payload_sizes = {p.name: p.size for p in payload.partitions}
             log.info("dry run: payload data is not extracted (sizes from the manifest)")
         else:
+            todo = [p for p in payload.partitions if not wanted or p.name in wanted]
+            bar = Progress(log, sum(p.size for p in todo) or 1, "extracting payload")
             payload_files = payload.extract_all(
                 os.path.join(work, "payload_parts"), names=wanted,
                 old_dir=args.old_image_dir, jobs=args.jobs, log=log,
+                progress=lambda done, total, name: bar.update(done, name),
             )
+            bar.close()
 
     # ---------------------------------------------------------- build plan
     slot_mode = "auto"
@@ -569,14 +573,22 @@ def cmd_build(args) -> int:
         return 0
 
     # ------------------------------------------------------------- write
+    total_bytes = max(int(plan["total_size"]), 1)
+    wbar = Progress(log, total_bytes, "writing image")
+    written = [0]
+
     def progress(i: int, n: int, entry) -> None:
-        log.info(f"[{i}/{n}] {entry.name}")
+        written[0] += int(getattr(entry, "size", 0) or 0)
+        wbar.update(written[0], f"[{i}/{n}] {entry.name}")
+        log.debug(f"[{i}/{n}] {entry.name}")
 
     if args.sparse:
         log.info("writing Android sparse image")
         builder.write_sparse(out, plan, log=log, progress=progress)
     else:
         builder.write(out, plan, log=log, progress=progress)
+    wbar.update(total_bytes, "done")
+    wbar.close()
     log.info(f"wrote {out} ({human_size(os.path.getsize(out))})")
 
     # ------------------------------------------------------------- verify
