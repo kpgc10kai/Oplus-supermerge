@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import bz2
 import hashlib
+import io
 import lzma
 import os
 import shutil
@@ -788,6 +789,23 @@ def test_merge_region_policy(tmp: str) -> None:
     check("model mismatch" in stderr.getvalue(), "model mismatch is warned about")
 
 
+def test_wizard_requires_terminal(tmp: str) -> None:
+    print("wizard refuses a non-interactive stdin")
+    import supermerge
+
+    class NotATty(io.StringIO):
+        def isatty(self) -> bool:
+            return False
+
+    old = sys.stdin
+    sys.stdin = NotATty("")
+    try:
+        rc = supermerge.main(["wizard", "-q", "--workdir", os.path.join(tmp, "wiz")])
+    finally:
+        sys.stdin = old
+    check(rc == 1, "wizard fails cleanly without a terminal")
+
+
 def test_merge(tmp: str) -> None:
     print("end-to-end merge (payload + EDL + template)")
     work = os.path.join(tmp, "merge")
@@ -911,7 +929,7 @@ def main() -> int:
                    test_payload_source_copy, test_bspatch, test_region_table,
                    test_region_build, test_region_super_selection,
                    test_region_folders, test_ofp_package, test_sparse_short_reads,
-                   test_merge_region_policy, test_merge,
+                   test_merge_region_policy, test_wizard_requires_terminal, test_merge,
                    test_template_only, test_slot_labelling):
             fn(tmp)
     finally:

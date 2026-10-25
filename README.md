@@ -131,6 +131,28 @@ extracted `.ofp` package, or a single `super.img`.
 `--payload` accepts a `payload.bin` or an OTA `.zip` (the inner `payload.bin` is
 extracted to `--workdir`).
 
+### Wizard
+
+If you would rather just point at the two packages instead of arranging a folder tree:
+
+```bash
+python supermerge.py wizard
+```
+
+```
+EDL package or folder: D:\ofp\CPH2841export_16.0.6.103
+  package: CPH2841, android 16, 11 variant(s): APC, ID, IN, JP, ...
+OTA payload.bin or .zip (blank to skip): D:\ota\payload.bin
+  payload: V17.0.0  CPH2841_11.C.10_1100_202610181148  android 17
+Region (APC/ID/IN/JP/...): IN
+Output file [super_IN.img]:
+Write a sparse image? (y/n) [y]:
+```
+
+The wizard only asks for the two paths (plus region, output, sparse), verifies that
+they exist, and then runs the same `build`. The `work/` layout above is just a
+suggestion for people who prefer a fixed tree.
+
 ## Region selection
 
 One OPPO package usually carries several sales-region variants of the regional

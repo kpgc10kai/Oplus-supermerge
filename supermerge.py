@@ -31,7 +31,7 @@ from smlib import lp
 from smlib import ofp as ofpmod
 from smlib import regions as regionsmod
 from smlib.models import model_from_payload_properties, models_compatible
-from smlib.payload import Payload, describe_version, open_payload
+from smlib.payload import Payload, describe_version, open_payload, read_properties
 from smlib.superimg import Entry, LayoutTemplate, SuperBuilder, SuperImage
 from smlib.util import (Console, Fail, human_size, parse_size,
                         setup_stdout, sha256_file, split_slot)
@@ -755,6 +755,8 @@ Example
   python supermerge.py build --edl work/edl --region IN \\
       --payload work/ota/payload.bin --sparse --out work/out/super_IN.img
 
+  python supermerge.py wizard      # asks for the paths instead of a folder layout
+
 Check both sides first with:
 
   python supermerge.py list --edl work/edl --payload work/ota/payload.bin
@@ -764,6 +766,106 @@ Check both sides first with:
 def cmd_layout(args) -> int:
     print(LAYOUT_TEXT, end="")
     return 0
+
+
+def _prompt(label: str, default: str = "") -> str:
+    hint = f" [{default}]" if default else ""
+    try:
+        value = input(f"{label}{hint}: ").strip()
+    except EOFError:
+        raise Fail("input closed") from None
+    return value or default
+
+
+def _peek_ota(path: str) -> dict[str, str]:
+    """payload_properties.txt of a payload.bin or an OTA .zip, without extracting it."""
+    if path.lower().endswith(".zip"):
+        import zipfile
+
+        try:
+            with zipfile.ZipFile(path) as zf:
+                data = zf.read("payload_properties.txt")
+        except (KeyError, OSError):
+            return {}
+        props: dict[str, str] = {}
+        for line in data.decode("utf-8", "replace").splitlines():
+            if line.strip() and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                props[key.strip()] = value.strip()
+        return props
+    return read_properties(os.path.join(os.path.dirname(path), "payload_properties.txt"))
+
+
+def cmd_wizard(args) -> int:
+    if not sys.stdin.isatty():
+        raise Fail("'wizard' needs an interactive terminal; pass --edl and --payload "
+                   "to 'build' instead")
+    print("supermerge wizard — press Enter to accept the default\n")
+
+    edl = ""
+    while not edl:
+        edl = _prompt("EDL package or folder")
+        if not edl:
+            print("  required: an extracted .ofp package, or a folder with "
+                  "rawprogram*.xml + images")
+        elif not os.path.exists(edl):
+            print(f"  not found: {edl}")
+            edl = ""
+
+    pkg = ofpmod.find_package(edl)
+    regions: list[str] = []
+    if pkg is not None:
+        try:
+            codes = sorted({v.region for v in pkg.variants if v.region})
+            regions = codes
+            print(f"  package: {pkg.package_model() or '?'}, "
+                  f"android {pkg.android_version()}, {len(pkg.variants)} variant(s)"
+                  + (f": {', '.join(codes)}" if codes else ""))
+        except Exception as exc:  # packaging oddities should not stop the wizard
+            print(f"  package: could not read the variant table ({exc})")
+    else:
+        print("  plain EDL folder (no .ofp package): the model cannot be checked")
+
+    ota = ""
+    while True:
+        ota = _prompt("OTA payload.bin or .zip (blank to skip)")
+        if not ota:
+            break
+        if not os.path.exists(ota):
+            print(f"  not found: {ota}")
+            continue
+        props = _peek_ota(ota)
+        print(f"  payload: {describe_version(props) if props else 'version unknown'}")
+        break
+
+    region = ""
+    if len(regions) > 1:
+        while True:
+            region = _prompt(f"Region ({'/'.join(regions)})").upper()
+            if not region or region in regions:
+                break
+            print(f"  pick one of: {', '.join(regions)}")
+    elif regions:
+        region = regions[0]
+        print(f"  region: {region}")
+
+    out = _prompt("Output file",
+                  f"super_{region}.img" if region else "super_merged.img")
+    sparse = _prompt("Write a sparse image? (y/n)", "y").lower().startswith("y")
+
+    argv = ["build", "--edl", edl, "--out", out]
+    if ota:
+        argv += ["--payload", ota]
+    if region:
+        argv += ["--region", region]
+    if sparse:
+        argv += ["--sparse"]
+    if getattr(args, "workdir", None):
+        argv += ["--workdir", args.workdir]
+    if args.verbose:
+        argv.append("-v")
+    print()
+    return main(argv)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -799,6 +901,11 @@ def build_parser() -> argparse.ArgumentParser:
     # layout
     sp = sub_parser("layout", help="print the recommended input folder layout")
     sp.set_defaults(func=cmd_layout)
+
+    # wizard
+    sp = sub_parser("wizard", help="ask for the EDL and OTA paths, then build")
+    sp.add_argument("--sparse", action="store_true", help=argparse.SUPPRESS)
+    sp.set_defaults(func=cmd_wizard)
 
     # list
     sp = sub_parser("list", parents=[common], help="show payload / EDL / super contents")
