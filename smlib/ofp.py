@@ -58,7 +58,9 @@ def looks_like_package(path: str) -> bool:
     return False
 
 
-def find_package(paths: list[str] | None) -> "OfpPackage | None":
+def find_package(paths: list[str] | str | None) -> "OfpPackage | None":
+    if isinstance(paths, str):          # a bare path is a single candidate
+        paths = [paths]
     for raw in paths or []:
         if looks_like_package(raw):
             return OfpPackage(raw)

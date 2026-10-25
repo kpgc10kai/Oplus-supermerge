@@ -581,6 +581,8 @@ def test_ofp_package(tmp: str) -> None:
     check(pkg.resolve(region="IN").region == "IN", "region from product_name")
     check(pkg.resolve(region="MY").nv_id == "00111000",
           "region from ro.oplus.image.my_region.type")
+    check(ofpmod.find_package(root) is not None,
+          "find_package accepts a bare path string")
 
     scratch = os.path.join(tmp, "ofp_work")
     out = os.path.join(tmp, "ofp_merged.img")
@@ -803,6 +805,18 @@ def test_merge_region_policy(tmp: str) -> None:
     with SuperImage(zout) as img:
         check(b"".join(img.iter_partition("system_a")) == sys_ota,
               "zip EDL package yields the same merge")
+
+    class Tty(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    old_stdin = sys.stdin
+    sys.stdin = Tty(f"{root}\n{payload}\nIN\n\n\n")
+    try:
+        rc = supermerge.main(["wizard", "--dry-run", "-q", "--workdir", scratch])
+    finally:
+        sys.stdin = old_stdin
+    check(rc == 0, "wizard collects the paths and a region (dry run)")
 
 
 def test_wizard_requires_terminal(tmp: str) -> None:

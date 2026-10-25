@@ -812,6 +812,11 @@ def cmd_wizard(args) -> int:
             print(f"  not found: {edl}")
             edl = ""
 
+    if edl.lower().endswith(".zip"):
+        print("  extracting the archive once for inspection (the build reuses it)")
+        edl = edlmod.materialize_inputs(
+            [edl], args.workdir, Console(args.quiet, args.verbose))[0]
+
     pkg = ofpmod.find_package(edl)
     regions: list[str] = []
     if pkg is not None:
@@ -864,6 +869,9 @@ def cmd_wizard(args) -> int:
         argv += ["--workdir", args.workdir]
     if args.verbose:
         argv.append("-v")
+    if getattr(args, "dry_run", False):
+        print("would run: python supermerge.py " + " ".join(argv))
+        return 0
     print()
     return main(argv)
 
@@ -904,7 +912,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # wizard
     sp = sub_parser("wizard", help="ask for the EDL and OTA paths, then build")
-    sp.add_argument("--sparse", action="store_true", help=argparse.SUPPRESS)
+    sp.add_argument("--dry-run", action="store_true",
+                    help="stop after the prompts and print the build command")
     sp.set_defaults(func=cmd_wizard)
 
     # list
