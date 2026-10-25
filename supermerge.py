@@ -828,7 +828,7 @@ def _browse(kind: str, title: str) -> str:
                 root.destroy()
             except Exception:
                 pass
-    return (pick or "").strip()
+    return os.path.normpath(pick) if pick else ""
 
 
 def _ask_path(label: str, kind: str = "file", allow_skip: bool = False,
@@ -898,8 +898,10 @@ def cmd_wizard(args) -> int:
     if pkg is not None:
         try:
             regions = sorted({v.region for v in pkg.variants if v.region})
+            note = (f", {len(regions)} with a sales region"
+                    + (" + base" if len(pkg.variants) > len(regions) else ""))
             print(f"  found: {pkg.package_model() or '?'}, android "
-                  f"{pkg.android_version()}, {len(pkg.variants)} variant(s)")
+                  f"{pkg.android_version()}, {len(pkg.variants)} variant(s){note}")
         except Exception as exc:
             print(f"  found a package, but the variant table is unreadable ({exc})")
     else:
@@ -955,6 +957,7 @@ def cmd_wizard(args) -> int:
         else:
             path = os.path.abspath(os.path.expanduser(raw))
             out = os.path.join(path, default_name) if os.path.isdir(path) else path
+    out = os.path.normpath(out)
     print(f"  -> {out}")
 
     # 5 ------------------------------------------------------------- sparse
