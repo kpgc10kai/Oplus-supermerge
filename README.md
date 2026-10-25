@@ -168,9 +168,12 @@ supermerge wizard
     APC  ID  IN  JP  MX  MY  SG  TH  TW  VN
   region: IN
 
-[4/5] Output file
-  Where to write the merged image. Press Enter for super_IN.img.
-  output file:
+[4/5] Output
+  Where to write the merged image. Enter opens a folder picker, an
+  existing folder is combined with super_IN.img, and any other path
+  is used as the file name.
+  output (Enter = browse for a folder): D:\work\out
+  -> D:\work\out\super_IN.img
 
 [5/5] Image format
   sparse = zero regions are skipped: smaller file, and what fastboot / EDL
@@ -180,8 +183,9 @@ supermerge wizard
   write a sparse image? (y/n): y
 ```
 
-Each path can be typed, pasted (quotes are stripped), or picked in the system file
-dialog by pressing Enter. `--dry-run` stops after the questions and prints the
+Each path can be typed, pasted (quotes are stripped), or picked in the system dialog
+by pressing Enter — at the EDL question you then choose `1) folder` or `2) .zip`, so
+an archive can be selected too. `--dry-run` stops after the questions and prints the
 equivalent `build` command. The `work/` layout above is just a suggestion for people
 who prefer a fixed tree.
 

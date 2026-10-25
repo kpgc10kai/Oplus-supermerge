@@ -869,7 +869,25 @@ def cmd_wizard(args) -> int:
     print("    - an extracted .ofp folder (version_info.txt + META/ + IMAGES/)")
     print("    - an EDL folder (rawprogram*.xml + *.img)")
     print("    - a .zip of either")
-    edl = _ask_path("  path", "dir", title="Select the EDL package folder")
+    edl = ""
+    while not edl:
+        raw = _prompt("  path (Enter = browse)")
+        raw = raw.strip().strip('"').strip("'")
+        if not raw:
+            kind = _prompt("    browse for 1) folder  2) .zip", "1").strip().lower()
+            if kind.startswith("2") or kind.startswith("z"):
+                picked = _browse("file", "Select the EDL package .zip")
+            else:
+                picked = _browse("dir", "Select the EDL package folder")
+            if not picked:
+                print("  nothing selected")
+                continue
+            raw = picked
+        path = os.path.abspath(os.path.expanduser(raw))
+        if os.path.exists(path):
+            edl = path
+        else:
+            print(f"  not found: {path}")
     if edl.lower().endswith(".zip"):
         print("  extracting the archive once for inspection (the build reuses it)")
         edl = edlmod.materialize_inputs([edl], args.workdir,
@@ -919,10 +937,25 @@ def cmd_wizard(args) -> int:
         print("  no regional variants; the package has a single layout")
 
     # 4 ------------------------------------------------------------- output
-    print("\n[4/5] Output file")
-    default_out = f"super_{region}.img" if region else "super_merged.img"
-    print(f"  Where to write the merged image. Press Enter for {default_out}.")
-    out = _prompt("  output file", default_out).strip().strip('"').strip("'")
+    print("\n[4/5] Output")
+    default_name = f"super_{region}.img" if region else "super_merged.img"
+    print("  Where to write the merged image. Enter opens a folder picker, an")
+    print(f"  existing folder is combined with {default_name}, and any other path")
+    print("  is used as the file name.")
+    out = ""
+    while not out:
+        raw = _prompt("  output (Enter = browse for a folder)")
+        raw = raw.strip().strip('"').strip("'")
+        if not raw:
+            folder = _browse("dir", "Select the output folder")
+            if not folder:
+                print("  nothing selected")
+                continue
+            out = os.path.join(folder, default_name)
+        else:
+            path = os.path.abspath(os.path.expanduser(raw))
+            out = os.path.join(path, default_name) if os.path.isdir(path) else path
+    print(f"  -> {out}")
 
     # 5 ------------------------------------------------------------- sparse
     print("\n[5/5] Image format")

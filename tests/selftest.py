@@ -811,7 +811,13 @@ def test_merge_region_policy(tmp: str) -> None:
             return True
 
     old_stdin = sys.stdin
-    sys.stdin = Tty(f"{root}\n{payload}\nIN\n\n\n")
+    wiz_out = os.path.join(tmp, "wizard_out.img")
+    from smlib import ofp as ofpmod
+    answers = [root, payload]
+    if len({v.region for v in ofpmod.OfpPackage(root).variants if v.region}) > 1:
+        answers.append("IN")          # only asked when the package has several regions
+    answers += [wiz_out, "y"]
+    sys.stdin = Tty("\n".join(answers) + "\n")
     try:
         rc = supermerge.main(["wizard", "--dry-run", "-q", "--workdir", scratch])
     finally:
