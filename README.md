@@ -85,7 +85,7 @@ python -m pip install -e .
 python supermerge.py --help
 ```
 
-If you see `python supermerge.py : The term 'supermerge' is not recognized` (PowerShell) or
+If PowerShell says `The term 'supermerge' is not recognized`, or your shell says
 `supermerge: command not found`, the package is simply not installed yet — use
 `python supermerge.py` instead.
 
