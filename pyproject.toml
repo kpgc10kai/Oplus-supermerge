@@ -3,7 +3,7 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "oppo-supermerge"
+name = "oplus-supermerge"
 version = "0.1.0"
 description = "Build a flashable super.img for OPPO / OnePlus / realme by merging an OTA payload.bin with EDL or .ofp packages"
 readme = "README.md"

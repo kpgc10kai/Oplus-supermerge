@@ -1,6 +1,6 @@
 [English](README.md) | 日本語
 
-# oppo-supermerge — OPPO/BBK 向け super.img マージツール
+# Oplus-supermerge — OPPO/BBK 向け super.img マージツール
 
 OTA の `payload.bin` に入っているパーティションと、EDL（firehose）フラッシュ用の
 パーティションイメージを突き合わせて、そのまま書き込める `super.img` を組み立てるツールです。

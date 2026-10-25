@@ -1,4 +1,4 @@
-# oppo-supermerge
+# Oplus-supermerge
 
 Build a flashable `super.img` for OPPO / OnePlus / realme (BBK) devices by merging an
 OTA `payload.bin` with EDL flash files or an extracted OPPO `.ofp` package.
@@ -37,8 +37,8 @@ wrote super_IN.img (12.49 GiB)
 ## Install
 
 ```bash
-git clone https://github.com/kpgc10kai/oppo-supermerge.git
-cd oppo-supermerge
+git clone https://github.com/kpgc10kai/Oplus-supermerge.git
+cd Oplus-supermerge
 python -m pip install -e .        # optional: gives you the `supermerge` command
 ```
 
