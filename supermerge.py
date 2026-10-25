@@ -713,11 +713,27 @@ def _add_global_options(p: argparse.ArgumentParser, sub: bool = False) -> None:
 
 
 LAYOUT_TEXT = """\
-Recommended input layout
-========================
+Two different trees
+===================
 
-Any OPPO / OnePlus / realme (Oplus) device works as long as the inputs follow the
-same on-disk formats — nothing is hard-coded to one model.
+`supermerge layout` describes the INPUTS, not the repository you cloned. The two
+trees have nothing in common, and that is expected.
+
+1) The tool (this repository — what you cloned)
+
+  Oplus-supermerge/
+  +-- supermerge.py         CLI entry point
+  +-- smlib/                library (payload, liblp, ofp, edl, sparse, regions)
+  +-- tests/selftest.py     self-test
+  +-- extras/               EROFS / LZ4 / UEFI FV / AVB helpers
+  +-- pyproject.toml        optional `pip install -e .`
+  +-- README.md
+  +-- LICENSE
+
+  Running `pip install -e .` additionally creates *.egg-info/ in the repository;
+  that is a build artifact and is git-ignored.
+
+2) The inputs (firmware data — create this anywhere, e.g. D:\\work)
 
   work/
   +-- edl/                  EDL input, one of:
@@ -726,16 +742,19 @@ same on-disk formats — nothing is hard-coded to one model.
   +-- ota/                  payload.bin, or the OTA .zip (inner payload.bin is used)
   +-- out/                  super.img is written here
 
+Any OPPO / OnePlus / realme (Oplus) device works as long as the inputs follow the
+same on-disk formats — nothing is hard-coded to one model. The EDL package and the
+OTA must be built for the same device; a mismatch is reported as a warning.
+
 Example
 -------
 
-  supermerge build --edl work/edl --region IN \\
+  python supermerge.py build --edl work/edl --region IN \\
       --payload work/ota/payload.bin --sparse --out work/out/super_IN.img
 
-Use the EDL package and the OTA built for the same device; a mismatch is reported
-as a warning. Check both sides first with:
+Check both sides first with:
 
-  supermerge list --edl work/edl --payload work/ota/payload.bin
+  python supermerge.py list --edl work/edl --payload work/ota/payload.bin
 """
 
 

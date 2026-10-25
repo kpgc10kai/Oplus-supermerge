@@ -41,7 +41,22 @@ wrote super_IN.img (12.49 GiB)
 The tool is model-agnostic. Supply the EDL package and the OTA built for **your**
 device; only the on-disk formats matter, and OPPO / OnePlus / realme share them.
 
+There are two unrelated trees:
+
 ```
+1) The tool — this repository (what you cloned)
+
+Oplus-supermerge/
+├── supermerge.py         CLI entry point
+├── smlib/                library (payload, liblp, ofp, edl, sparse, regions)
+├── tests/selftest.py     self-test
+├── extras/               EROFS / LZ4 / UEFI FV / AVB helpers
+├── pyproject.toml        optional `pip install -e .`
+├── README.md
+└── LICENSE
+
+2) The inputs — firmware data, created anywhere (e.g. D:\work)
+
 work/
 ├── edl/                  EDL input, one of:
 │   ├── <extracted .ofp>  version_info.txt + META/ + IMAGES/   (layout + region)
@@ -50,8 +65,9 @@ work/
 └── out/                  super.img is written here
 ```
 
-`python supermerge.py layout` prints the same tree. Point `--edl` and `--payload` at those
-paths; nothing needs to be renamed.
+`python supermerge.py layout` prints both trees. The `work/` folders are not part of
+the repository; create them wherever you keep firmware. Point `--edl` and `--payload`
+at those paths; nothing needs to be renamed.
 
 Use the package and the OTA for the same device. If they disagree you get a warning
 instead of a silently broken image:
@@ -94,19 +110,20 @@ Only `REPLACE_ZSTD` payloads need an extra package (`pip install zstandard`).
 ## Quick start
 
 ```bash
-# 0. where to put the inputs
+# 0. where to put the inputs (prints both trees)
 python supermerge.py layout
 
 # 1. see what you have (also prints both device models)
-python supermerge.py list --payload payload.bin --edl edl_dir
-python supermerge.py list --edl ofp_package --list-regions
+python supermerge.py list --edl work/edl --payload work/ota/payload.bin
+python supermerge.py list --edl work/edl --list-regions
 
 # 2. build (EDL package = layout + region, OTA = newer partitions)
-python supermerge.py build --edl ofp_package --region IN --payload payload.bin \
-    --sparse --verify --out super_IN.img
+python supermerge.py build --edl work/edl --region IN --payload work/ota/payload.bin \
+    --sparse --verify --out work/out/super_IN.img
 
 # 3. check the result
-python supermerge.py verify --super super_IN.img --edl ofp_package --region IN --payload payload.bin
+python supermerge.py verify --super work/out/super_IN.img --edl work/edl \
+    --region IN --payload work/ota/payload.bin
 ```
 
 `--edl` may be a folder with `rawprogram*.xml`, a folder of loose `.img` files, an
