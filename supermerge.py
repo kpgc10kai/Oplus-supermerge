@@ -278,6 +278,9 @@ def cmd_build(args) -> int:
         region.code if region is not None else None)
     default_out = f"super_{code}.img" if code else "super_merged.img"
     out = os.path.abspath(args.out or default_out)
+    parent = os.path.dirname(out)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     confirm_overwrite(out, args.force)
     overrides = parse_variants(args.variant)
 
