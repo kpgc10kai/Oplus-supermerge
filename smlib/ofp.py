@@ -293,6 +293,18 @@ class OfpPackage:
         return out
 
     # --------------------------------------------------------------- report
+    def package_model(self) -> str | None:
+        """Device model of the package (``ro.product.model``, else variant data)."""
+        props = self._root_props()
+        for key in ("ro.product.model", "ro.product.name"):
+            value = props.get(key, "").strip()
+            if value:
+                return value.upper()
+        models = {v.product_model.upper() for v in self.variants if v.product_model}
+        if len(models) == 1:
+            return models.pop()
+        return None
+
     def package_version(self) -> str:
         """Short version string of the package as a whole."""
         props = self._root_props()

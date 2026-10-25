@@ -764,6 +764,29 @@ def test_merge_region_policy(tmp: str) -> None:
                           "--payload", payload, "-q", "--workdir", scratch])
     check(rc == 0, "verify accepts either source for each partition")
 
+    # model detection and mismatch warning
+    from smlib.models import model_from_payload_properties, models_compatible
+    check(model_from_payload_properties(
+        {"compatible_ota_prefix_list": "PYB110,PYB110PRE"}) == "PYB110",
+        "model from compatible_ota_prefix_list")
+    check(model_from_payload_properties(
+        {"ota_target_version": "CPH2841_11.C.10_1100_202610181148"}) == "CPH2841",
+        "model from ota_target_version")
+    check(models_compatible("CPH2841", "CPH2841IN"), "prefix models are compatible")
+    check(not models_compatible("CPH2841", "PYB110"), "different models are incompatible")
+
+    import contextlib
+    import io
+    with open(os.path.join(root, "build.prop"), "w", encoding="utf-8") as f:
+        f.write("ro.product.model=CPH2841\n")
+    with open(os.path.join(tmp, "payload_properties.txt"), "w", encoding="utf-8") as f:
+        f.write("compatible_ota_prefix_list=PYB110\n")
+    stderr = io.StringIO()
+    with contextlib.redirect_stderr(stderr):
+        rc, _ = build("merge_mismatch.img")
+    check(rc == 0, "build still completes for a mismatched model pair")
+    check("model mismatch" in stderr.getvalue(), "model mismatch is warned about")
+
 
 def test_merge(tmp: str) -> None:
     print("end-to-end merge (payload + EDL + template)")

@@ -33,6 +33,37 @@ wrote super_IN.img (12.49 GiB)
 * **Streaming sparse output**, so a 19 GiB super does not need a 19 GiB temp file.
 * **Verification**: liblp conformance checks (the same rules `liblp` applies) plus
   per-partition content hashes against every available source.
+* **Model check**: the device model is read from the OTA (`payload_properties.txt`) and
+  from the package (`ro.product.model`); a mismatch between the two is reported.
+
+## Choosing the inputs
+
+The tool is model-agnostic. Supply the EDL package and the OTA built for **your**
+device; only the on-disk formats matter, and OPPO / OnePlus / realme share them.
+
+```
+work/
+├── edl/                  EDL input, one of:
+│   ├── <extracted .ofp>  version_info.txt + META/ + IMAGES/   (layout + region)
+│   └── <edl folder>      rawprogram*.xml + *.img, loose *.img, or super.img
+├── ota/                  payload.bin, or the OTA .zip (the inner payload.bin is used)
+└── out/                  super.img is written here
+```
+
+`supermerge layout` prints the same tree. Point `--edl` and `--payload` at those
+paths; nothing needs to be renamed.
+
+Use the package and the OTA for the same device. If they disagree you get a warning
+instead of a silently broken image:
+
+```
+warning: model mismatch: the OTA targets PYB110 but the package is CPH2841. The merged
+super is unlikely to boot; use the OTA and the EDL/package built for the same device.
+```
+
+The model comes from `compatible_ota_prefix_list` / `ota_target_version` in
+`payload_properties.txt`, and from `ro.product.model` in the package's `build.prop`.
+When one side cannot be determined the check is skipped (no false alarms).
 
 ## Install
 
@@ -53,7 +84,10 @@ Only `REPLACE_ZSTD` payloads need an extra package (`pip install zstandard`).
 ## Quick start
 
 ```bash
-# 1. see what you have
+# 0. where to put the inputs
+supermerge layout
+
+# 1. see what you have (also prints both device models)
 supermerge list --payload payload.bin --edl edl_dir
 supermerge list --edl ofp_package --list-regions
 

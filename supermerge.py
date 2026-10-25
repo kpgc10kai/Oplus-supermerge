@@ -30,6 +30,7 @@ from smlib import edl as edlmod
 from smlib import lp
 from smlib import ofp as ofpmod
 from smlib import regions as regionsmod
+from smlib.models import model_from_payload_properties, models_compatible
 from smlib.payload import Payload, describe_version, open_payload
 from smlib.superimg import Entry, LayoutTemplate, SuperBuilder, SuperImage
 from smlib.util import (Console, Fail, human_size, parse_size,
@@ -149,6 +150,7 @@ def cmd_list(args) -> int:
         print(payload_summary(payload))
     table = load_region_table(args, log)
     sources = None
+    pkg = None
     if getattr(args, "ofp", None):
         pkg = ofpmod.OfpPackage(args.ofp)
         print(pkg.summary())
@@ -179,6 +181,16 @@ def cmd_list(args) -> int:
                 for p in problems:
                     print(f"#   {p}")
                 rc = 2
+    ota_model = model_from_payload_properties(payload.properties) if args.payload else None
+    package_model = pkg.package_model() if pkg is not None else None
+    if ota_model:
+        print(f"# payload model: {ota_model}")
+    if package_model:
+        print(f"# package model: {package_model}")
+    if not models_compatible(ota_model, package_model):
+        print(f"# warning: model mismatch ({ota_model} vs {package_model}); "
+              "use the OTA and the EDL/package for the same device")
+        rc = rc or 2
     return rc
 
 
@@ -301,7 +313,20 @@ def cmd_build(args) -> int:
         raise Fail(
             "no super layout to work from: pass --template super.img "
             "(or point --edl at a folder containing one), "
-            "or use --from-scratch with --group"
+            "or use --from-scratch with --group. See 'supermerge layout'."
+        )
+
+    ota_model = model_from_payload_properties(payload.properties) if payload else None
+    package_model = pkg.package_model() if pkg is not None else None
+    if ota_model:
+        log.info(f"payload model: {ota_model}")
+    if package_model:
+        log.info(f"package model: {package_model}")
+    if not models_compatible(ota_model, package_model):
+        log.warn(
+            f"model mismatch: the OTA targets {ota_model} but the package is "
+            f"{package_model}. The merged super is unlikely to boot; use the OTA "
+            "and the EDL/package built for the same device."
         )
 
     # -------------------------------------------------- which payload parts
@@ -687,6 +712,38 @@ def _add_global_options(p: argparse.ArgumentParser, sub: bool = False) -> None:
                    help="scratch directory for extracted images (default: supermerge_work)")
 
 
+LAYOUT_TEXT = """\
+Recommended input layout
+========================
+
+Any OPPO / OnePlus / realme (Oplus) device works as long as the inputs follow the
+same on-disk formats — nothing is hard-coded to one model.
+
+  work/
+  +-- edl/                  EDL input, one of:
+  |   +-- <extracted .ofp>  version_info.txt + META/ + IMAGES/   (layout + region)
+  |   +-- <edl folder>      rawprogram*.xml + *.img, loose *.img, or super.img
+  +-- ota/                  payload.bin, or the OTA .zip (inner payload.bin is used)
+  +-- out/                  super.img is written here
+
+Example
+-------
+
+  supermerge build --edl work/edl --region IN \\
+      --payload work/ota/payload.bin --sparse --out work/out/super_IN.img
+
+Use the EDL package and the OTA built for the same device; a mismatch is reported
+as a warning. Check both sides first with:
+
+  supermerge list --edl work/edl --payload work/ota/payload.bin
+"""
+
+
+def cmd_layout(args) -> int:
+    print(LAYOUT_TEXT, end="")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="supermerge",
@@ -716,6 +773,10 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name, **kwargs)
         _add_global_options(sp, sub=True)
         return sp
+
+    # layout
+    sp = sub_parser("layout", help="print the recommended input folder layout")
+    sp.set_defaults(func=cmd_layout)
 
     # list
     sp = sub_parser("list", parents=[common], help="show payload / EDL / super contents")
