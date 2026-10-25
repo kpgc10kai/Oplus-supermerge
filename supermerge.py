@@ -796,67 +796,141 @@ def _peek_ota(path: str) -> dict[str, str]:
     return read_properties(os.path.join(os.path.dirname(path), "payload_properties.txt"))
 
 
+def _browse(kind: str, title: str) -> str:
+    """Open a file dialog; return '' when tkinter is unavailable."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except Exception as exc:  # headless or slim python
+        print(f"  file dialog unavailable ({exc}); type the path instead")
+        return ""
+    root = None
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            pass
+        if kind == "dir":
+            pick = filedialog.askdirectory(title=title)
+        else:
+            pick = filedialog.askopenfilename(
+                title=title,
+                filetypes=[("OTA or EDL package", "*.zip *.bin *.img"),
+                           ("All files", "*.*")])
+    except Exception as exc:
+        print(f"  file dialog failed ({exc}); type the path instead")
+        return ""
+    finally:
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
+    return (pick or "").strip()
+
+
+def _ask_path(label: str, kind: str = "file", allow_skip: bool = False,
+              title: str = "Select a file") -> str:
+    hint = "Enter = browse"
+    if allow_skip:
+        hint += ", 'skip' = none"
+    while True:
+        raw = _prompt(f"{label} ({hint})")
+        raw = raw.strip().strip('"').strip("'")
+        if allow_skip and raw.lower() in ("skip", "none", "-", "no"):
+            return ""
+        if not raw:
+            picked = _browse(kind, title)
+            if picked:
+                raw = picked
+            else:
+                print("  nothing selected")
+                continue
+        path = os.path.abspath(os.path.expanduser(raw))
+        if os.path.exists(path):
+            return path
+        print(f"  not found: {path}")
+
+
 def cmd_wizard(args) -> int:
     if not sys.stdin.isatty():
         raise Fail("'wizard' needs an interactive terminal; pass --edl and --payload "
                    "to 'build' instead")
-    print("supermerge wizard — press Enter to accept the default\n")
 
-    edl = ""
-    while not edl:
-        edl = _prompt("EDL package, folder or .zip")
-        if not edl:
-            print("  required: an extracted .ofp package, a folder with "
-                  "rawprogram*.xml + images, or a .zip of either")
-        elif not os.path.exists(edl):
-            print(f"  not found: {edl}")
-            edl = ""
+    print("supermerge wizard")
+    print("  Five questions. Enter accepts the default, and an empty path opens a")
+    print("  file picker. Ctrl+C aborts without touching anything.\n")
 
+    # 1 ---------------------------------------------------------------- EDL
+    print("[1/5] EDL package")
+    print("  Provides the partition layout and the regional partitions. One of:")
+    print("    - an extracted .ofp folder (version_info.txt + META/ + IMAGES/)")
+    print("    - an EDL folder (rawprogram*.xml + *.img)")
+    print("    - a .zip of either")
+    edl = _ask_path("  path", "dir", title="Select the EDL package folder")
     if edl.lower().endswith(".zip"):
         print("  extracting the archive once for inspection (the build reuses it)")
-        edl = edlmod.materialize_inputs(
-            [edl], args.workdir, Console(args.quiet, args.verbose))[0]
+        edl = edlmod.materialize_inputs([edl], args.workdir,
+                                        Console(args.quiet, args.verbose))[0]
 
     pkg = ofpmod.find_package(edl)
     regions: list[str] = []
     if pkg is not None:
         try:
-            codes = sorted({v.region for v in pkg.variants if v.region})
-            regions = codes
-            print(f"  package: {pkg.package_model() or '?'}, "
-                  f"android {pkg.android_version()}, {len(pkg.variants)} variant(s)"
-                  + (f": {', '.join(codes)}" if codes else ""))
-        except Exception as exc:  # packaging oddities should not stop the wizard
-            print(f"  package: could not read the variant table ({exc})")
+            regions = sorted({v.region for v in pkg.variants if v.region})
+            print(f"  found: {pkg.package_model() or '?'}, android "
+                  f"{pkg.android_version()}, {len(pkg.variants)} variant(s)")
+        except Exception as exc:
+            print(f"  found a package, but the variant table is unreadable ({exc})")
     else:
         print("  plain EDL folder (no .ofp package): the model cannot be checked")
 
-    ota = ""
-    while True:
-        ota = _prompt("OTA payload.bin or .zip (blank to skip)")
-        if not ota:
-            break
-        if not os.path.exists(ota):
-            print(f"  not found: {ota}")
-            continue
+    # 2 ---------------------------------------------------------------- OTA
+    print("\n[2/5] OTA payload (optional)")
+    print("  The full OTA zip or payload.bin for the same device. Its partitions")
+    print("  replace the older ones from the EDL package. 'skip' keeps the EDL only.")
+    ota = _ask_path("  path", "file", allow_skip=True,
+                    title="Select the OTA payload.bin or the OTA .zip")
+    if ota:
         props = _peek_ota(ota)
-        print(f"  payload: {describe_version(props) if props else 'version unknown'}")
-        break
+        print(f"  found: {describe_version(props) if props else 'version unknown'}")
+    else:
+        print("  no OTA: the merged image will be the EDL package as-is")
 
-    region = ""
+    # 3 ------------------------------------------------------------- region
+    print("\n[3/5] Region")
     if len(regions) > 1:
-        while True:
-            region = _prompt(f"Region ({'/'.join(regions)})").upper()
-            if not region or region in regions:
-                break
-            print(f"  pick one of: {', '.join(regions)}")
+        print(f"  This package ships {len(regions)} regional variants: my_region,")
+        print("  my_preload and my_manifest differ per sales region. Pick the")
+        print("  region of the device you are flashing:")
+        print("    " + "  ".join(regions))
+        region = ""
+        while region not in regions:
+            region = _prompt("  region").upper()
+            if region not in regions:
+                print(f"  choose one of: {', '.join(regions)}")
     elif regions:
         region = regions[0]
-        print(f"  region: {region}")
+        print(f"  only one variant in this package: {region}")
+    else:
+        region = ""
+        print("  no regional variants; the package has a single layout")
 
-    out = _prompt("Output file",
-                  f"super_{region}.img" if region else "super_merged.img")
-    sparse = _prompt("Write a sparse image? (y/n)", "y").lower().startswith("y")
+    # 4 ------------------------------------------------------------- output
+    print("\n[4/5] Output file")
+    default_out = f"super_{region}.img" if region else "super_merged.img"
+    print(f"  Where to write the merged image. Press Enter for {default_out}.")
+    out = _prompt("  output file", default_out).strip().strip('"').strip("'")
+
+    # 5 ------------------------------------------------------------- sparse
+    print("\n[5/5] Image format")
+    print("  sparse = zero regions are skipped: smaller file, and what fastboot /")
+    print("           EDL flashing expects")
+    print("  raw    = full-size image (as large as the super partition), for dd or")
+    print("           a raw EDL write")
+    sparse = _prompt("  write a sparse image? (y/n)", "y").lower().startswith("y")
 
     argv = ["build", "--edl", edl, "--out", out]
     if ota:
@@ -870,7 +944,7 @@ def cmd_wizard(args) -> int:
     if args.verbose:
         argv.append("-v")
     if getattr(args, "dry_run", False):
-        print("would run: python supermerge.py " + " ".join(argv))
+        print("\nwould run: python supermerge.py " + " ".join(argv))
         return 0
     print()
     return main(argv)

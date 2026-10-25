@@ -137,25 +137,53 @@ it first (`version_info.txt` + `META/` + `IMAGES/`) or zip that folder and pass 
 
 ### Wizard
 
-If you would rather just point at the two packages instead of arranging a folder tree:
+If you would rather be asked for the packages instead of arranging a folder tree:
 
 ```bash
 python supermerge.py wizard
 ```
 
 ```
-EDL package or folder: D:\ofp\CPH2841export_16.0.6.103
-  package: CPH2841, android 16, 11 variant(s): APC, ID, IN, JP, ...
-OTA payload.bin or .zip (blank to skip): D:\ota\payload.bin
-  payload: V17.0.0  CPH2841_11.C.10_1100_202610181148  android 17
-Region (APC/ID/IN/JP/...): IN
-Output file [super_IN.img]:
-Write a sparse image? (y/n) [y]:
+supermerge wizard
+  Five questions. Enter accepts the default, and an empty path opens a
+  file picker. Ctrl+C aborts without touching anything.
+
+[1/5] EDL package
+  Provides the partition layout and the regional partitions. One of:
+    - an extracted .ofp folder (version_info.txt + META/ + IMAGES/)
+    - an EDL folder (rawprogram*.xml + *.img)
+    - a .zip of either
+  path (Enter = browse): D:\ofp\CPH2841export_16.0.6.103
+  found: CPH2841, android 16, 11 variant(s)
+
+[2/5] OTA payload (optional)
+  The full OTA zip or payload.bin for the same device. Its partitions
+  replace the older ones from the EDL package. 'skip' keeps the EDL only.
+  path (Enter = browse, 'skip' = none): D:\ota\payload.bin
+  found: V17.0.0  CPH2841_11.C.10_1100_202610181148  android 17
+
+[3/5] Region
+  This package ships 11 regional variants: my_region, my_preload and
+  my_manifest differ per sales region. Pick the region of the device:
+    APC  ID  IN  JP  MX  MY  SG  TH  TW  VN
+  region: IN
+
+[4/5] Output file
+  Where to write the merged image. Press Enter for super_IN.img.
+  output file:
+
+[5/5] Image format
+  sparse = zero regions are skipped: smaller file, and what fastboot / EDL
+           flashing expects
+  raw    = full-size image (as large as the super partition), for dd or a
+           raw EDL write
+  write a sparse image? (y/n): y
 ```
 
-The wizard only asks for the two paths (plus region, output, sparse), verifies that
-they exist, and then runs the same `build`. The `work/` layout above is just a
-suggestion for people who prefer a fixed tree.
+Each path can be typed, pasted (quotes are stripped), or picked in the system file
+dialog by pressing Enter. `--dry-run` stops after the questions and prints the
+equivalent `build` command. The `work/` layout above is just a suggestion for people
+who prefer a fixed tree.
 
 ## Region selection
 
