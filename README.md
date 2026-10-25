@@ -4,10 +4,10 @@ Build a flashable `super.img` for OPPO / OnePlus / realme (BBK) devices by mergi
 OTA `payload.bin` with EDL flash files or an extracted OPPO `.ofp` package.
 
 No `lpmake`, `lpdump` or `lpunpack` required — the liblp metadata is read and written
-directly, in pure Python (3.9+, standard library only).
+directly, in pure Python (3.10+, standard library only).
 
 ```
-$ supermerge build --edl CPH2841export_16.0.6.103 --region IN \
+$ python supermerge.py build --edl CPH2841export_16.0.6.103 --region IN \
       --payload payload.bin --sparse --out super_IN.img
 package variant: 00011011 / IN / CPH2841IN
 package build: CPH2841_11.A.33_0330_202604020155…  (android 16)
@@ -50,7 +50,7 @@ work/
 └── out/                  super.img is written here
 ```
 
-`supermerge layout` prints the same tree. Point `--edl` and `--payload` at those
+`python supermerge.py layout` prints the same tree. Point `--edl` and `--payload` at those
 paths; nothing needs to be renamed.
 
 Use the package and the OTA for the same device. If they disagree you get a warning
@@ -67,17 +67,27 @@ When one side cannot be determined the check is skipped (no false alarms).
 
 ## Install
 
+No installation is required. Clone and run the script in place:
+
 ```bash
 git clone https://github.com/kpgc10kai/Oplus-supermerge.git
 cd Oplus-supermerge
-python -m pip install -e .        # optional: gives you the `supermerge` command
-```
-
-Or just run it in place:
-
-```bash
 python supermerge.py --help
 ```
+
+All examples below use `python supermerge.py …` because that always works, with or
+without installation.
+
+Optionally install it to get a `supermerge` command on your PATH:
+
+```bash
+python -m pip install -e .
+python supermerge.py --help
+```
+
+If you see `python supermerge.py : The term 'supermerge' is not recognized` (PowerShell) or
+`supermerge: command not found`, the package is simply not installed yet — use
+`python supermerge.py` instead.
 
 Only `REPLACE_ZSTD` payloads need an extra package (`pip install zstandard`).
 
@@ -85,18 +95,18 @@ Only `REPLACE_ZSTD` payloads need an extra package (`pip install zstandard`).
 
 ```bash
 # 0. where to put the inputs
-supermerge layout
+python supermerge.py layout
 
 # 1. see what you have (also prints both device models)
-supermerge list --payload payload.bin --edl edl_dir
-supermerge list --edl ofp_package --list-regions
+python supermerge.py list --payload payload.bin --edl edl_dir
+python supermerge.py list --edl ofp_package --list-regions
 
 # 2. build (EDL package = layout + region, OTA = newer partitions)
-supermerge build --edl ofp_package --region IN --payload payload.bin \
+python supermerge.py build --edl ofp_package --region IN --payload payload.bin \
     --sparse --verify --out super_IN.img
 
 # 3. check the result
-supermerge verify --super super_IN.img --edl ofp_package --region IN --payload payload.bin
+python supermerge.py verify --super super_IN.img --edl ofp_package --region IN --payload payload.bin
 ```
 
 `--edl` may be a folder with `rawprogram*.xml`, a folder of loose `.img` files, an
@@ -112,10 +122,10 @@ partitions. The region is read from `MY_MANIFEST/build.<nv>.prop`
 suffix (`CPH2841IN`).
 
 ```bash
-supermerge build --edl package --region IN        # country code
-supermerge build --edl package --region 00011011  # NV value (from regions.json)
-supermerge build --edl package --nv 00111011      # NV id directly
-supermerge build --edl package --region generic   # the common base variant
+python supermerge.py build --edl package --region IN        # country code
+python supermerge.py build --edl package --region 00011011  # NV value (from regions.json)
+python supermerge.py build --edl package --nv 00111011      # NV id directly
+python supermerge.py build --edl package --region generic   # the common base variant
 ```
 
 Without a region the build refuses and lists the variants:
@@ -167,7 +177,7 @@ Written exactly like liblp expects (`system/core/fs_mgr/liblp`):
 
 ## Verification
 
-`supermerge verify` re-parses the image and checks:
+`python supermerge.py verify` re-parses the image and checks:
 
 * liblp conformance (header size vs version, table bounds, attribute mask,
   `first_logical_sector` vs metadata region, all metadata copies identical)
