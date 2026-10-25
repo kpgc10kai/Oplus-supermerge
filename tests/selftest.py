@@ -788,6 +788,22 @@ def test_merge_region_policy(tmp: str) -> None:
     check(rc == 0, "build still completes for a mismatched model pair")
     check("model mismatch" in stderr.getvalue(), "model mismatch is warned about")
 
+    import zipfile
+    zpath = os.path.join(tmp, "region_pkg.zip")
+    with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as zf:
+        for dirpath, _dirs, files in os.walk(root):
+            for item in files:
+                full = os.path.join(dirpath, item)
+                zf.write(full, os.path.relpath(full, root).replace(os.sep, "/"))
+    zout = os.path.join(tmp, "merge_zip.img")
+    rc = supermerge.main(["build", "--edl", zpath, "--region", "IN",
+                          "--payload", payload, "--out", zout, "--force",
+                          "-q", "--workdir", scratch])
+    check(rc == 0, "EDL package as a .zip builds")
+    with SuperImage(zout) as img:
+        check(b"".join(img.iter_partition("system_a")) == sys_ota,
+              "zip EDL package yields the same merge")
+
 
 def test_wizard_requires_terminal(tmp: str) -> None:
     print("wizard refuses a non-interactive stdin")

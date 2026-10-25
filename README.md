@@ -127,9 +127,13 @@ python supermerge.py verify --super work/out/super_IN.img --edl work/edl \
 ```
 
 `--edl` may be a folder with `rawprogram*.xml`, a folder of loose `.img` files, an
-extracted `.ofp` package, or a single `super.img`.
+extracted `.ofp` package, a single `super.img`, **or a `.zip` of any of those** (the
+archive is extracted once into `--workdir` and reused on later runs).
 `--payload` accepts a `payload.bin` or an OTA `.zip` (the inner `payload.bin` is
 extracted to `--workdir`).
+
+A `.ofp` file itself is a proprietary container and cannot be read directly — extract
+it first (`version_info.txt` + `META/` + `IMAGES/`) or zip that folder and pass the zip.
 
 ### Wizard
 

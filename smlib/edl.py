@@ -13,12 +13,93 @@ resolved with a region table (see :mod:`smlib.regions`).
 
 from __future__ import annotations
 
+import hashlib
 import os
+import shutil
 import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass
 
 from . import lp, sparse
 from .util import Console, Fail, human_size
+
+
+def _looks_like_package(path: str) -> bool:
+    return os.path.isfile(os.path.join(path, "version_info.txt"))
+
+
+def _package_root(path: str) -> str:
+    """A zip may wrap the package in a single top-level folder."""
+    if _looks_like_package(path):
+        return path
+    try:
+        entries = os.listdir(path)
+    except OSError:
+        return path
+    if len(entries) == 1:
+        child = os.path.join(path, entries[0])
+        if os.path.isdir(child) and _looks_like_package(child):
+            return child
+    return path
+
+
+def _extract_zip(path: str, dest: str, log: Console | None) -> None:
+    with zipfile.ZipFile(path) as zf:
+        names = zf.namelist()
+        if "payload.bin" in names and not any(
+                name.endswith("version_info.txt") for name in names):
+            raise Fail(f"{path}: this is an OTA package (payload.bin); "
+                       "pass it to --payload, not --edl")
+        base = os.path.abspath(dest)
+        os.makedirs(base, exist_ok=True)
+        for info in zf.infolist():
+            target = os.path.abspath(os.path.join(base, info.filename))
+            if not (target == base or target.startswith(base + os.sep)):
+                raise Fail(f"{path}: refusing unsafe path in archive: {info.filename}")
+            if info.is_dir():
+                os.makedirs(target, exist_ok=True)
+                continue
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with zf.open(info) as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst, 1 << 20)
+        if log:
+            log.info(f"extracted {path} -> {dest} (kept for next runs)")
+
+
+def materialize_inputs(paths: list[str] | None, work_dir: str,
+                       log: Console | None = None) -> list[str]:
+    """Turn EDL inputs into something the scanners can read.
+
+    * directories and image files are passed through
+    * ``.zip`` archives are extracted once into ``<work_dir>/edl_<hash>``
+    * ``.ofp`` files are proprietary containers and must be extracted first
+    """
+    out: list[str] = []
+    for raw in paths or []:
+        path = os.path.abspath(raw)
+        if os.path.isdir(path):
+            out.append(path)
+            continue
+        lower = path.lower()
+        if lower.endswith(".ofp"):
+            raise Fail(f"{raw}: .ofp is a proprietary container; extract it first "
+                       "(version_info.txt + META/ + IMAGES/) and pass that folder")
+        if not lower.endswith(".zip"):
+            out.append(path)
+            continue
+        try:
+            stat = os.stat(path)
+        except OSError as exc:
+            raise Fail(f"{raw}: {exc}") from None
+        key = f"{path}|{stat.st_size}|{int(stat.st_mtime)}"
+        digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
+        dest = os.path.join(os.path.abspath(work_dir), f"edl_{digest}")
+        if not os.path.isdir(dest):
+            _extract_zip(path, dest, log)
+        elif log:
+            log.debug(f"reusing extracted EDL package {dest}")
+        out.append(_package_root(dest))
+    return out
 
 SKIP_LABELS = {"", "gpt", "primarygpt", "backupgpt", "ssd", "persist"}
 

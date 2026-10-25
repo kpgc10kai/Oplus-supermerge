@@ -804,10 +804,10 @@ def cmd_wizard(args) -> int:
 
     edl = ""
     while not edl:
-        edl = _prompt("EDL package or folder")
+        edl = _prompt("EDL package, folder or .zip")
         if not edl:
-            print("  required: an extracted .ofp package, or a folder with "
-                  "rawprogram*.xml + images")
+            print("  required: an extracted .ofp package, a folder with "
+                  "rawprogram*.xml + images, or a .zip of either")
         elif not os.path.exists(edl):
             print(f"  not found: {edl}")
             edl = ""
@@ -993,6 +993,9 @@ def main(argv: list[str] | None = None) -> int:
     setup_stdout()
     args = build_parser().parse_args(argv)
     try:
+        if getattr(args, "edl", None):
+            args.edl = edlmod.materialize_inputs(
+                args.edl, args.workdir, Console(args.quiet, args.verbose))
         return args.func(args) or 0
     except Fail as exc:
         print(f"error: {exc}", file=sys.stderr)
